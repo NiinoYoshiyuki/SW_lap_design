@@ -75,7 +75,7 @@
             border: 1px solid var(--border-color);
             flex-grow: 1;
         }
-        
+
         @media (max-width: 768px) {
             .column {
                 min-width: 90%;
@@ -147,7 +147,7 @@
         #stopButton { background-color: var(--button-stop); }
         #resetButton { background-color: var(--button-reset); }
         #lapButton { background-color: var(--button-lap); }
-        
+
         .add-runner-btn {
             width: 100%;
             padding: 12px;
@@ -171,14 +171,14 @@
             color: var(--bg-color);
         }
 
-        #exportAllButton { 
+        #exportAllButton {
             background-color: var(--export-all-btn-color);
             color: white;
             border: none;
             margin-top: 15px;
             width: 100%;
         }
-        
+
         #clearAllButton {
             background-color: var(--clear-all-btn-color);
             color: white;
@@ -240,7 +240,7 @@
             font-weight: 500;
             color: var(--text-color);
         }
-        
+
         .delete-btn {
             background: none;
             border: none;
@@ -249,7 +249,7 @@
             font-size: 1em;
             transition: color 0.2s, transform 0.2s;
         }
-        
+
         .delete-btn:hover {
             color: #ff6347;
             transform: scale(1.1);
@@ -291,11 +291,11 @@
         .header-record-labels span:nth-child(1) { /* No */
             justify-self: start;
         }
-        
+
         .header-record-labels span:nth-child(2) { /* Lap */
-            justify-self: center; 
+            justify-self: center;
         }
-        
+
         .header-record-labels span:nth-child(3) { /* Goal */
             justify-self: center; /* 中央に配置し、少し左に寄せる */
         }
@@ -305,7 +305,7 @@
             font-weight: 600;
             color: var(--accent-color);
         }
-        
+
         #deleteRunnerButton {
             background-color: var(--delete-btn-color);
             color: white;
@@ -317,11 +317,11 @@
             transition: background-color 0.3s;
             white-space: nowrap;
         }
-        
+
         #deleteRunnerButton:hover:not(:disabled) {
             background-color: #ff6347;
         }
-        
+
         #deleteRunnerButton:disabled {
             background-color: var(--disabled-color);
             cursor: not-allowed;
@@ -339,7 +339,7 @@
         .selected-runner-record-item:last-child {
             border-bottom: none;
         }
-        
+
         .selected-runner-record-item .record-number {
             font-weight: 500;
             color: var(--secondary-text-color);
@@ -356,7 +356,7 @@
             text-align: center; /* ラップタイムは中央揃え */
             grid-column: 2 / 3;
         }
-        
+
         .selected-runner-record-item .runner-goal-time {
             font-family: var(--font-display);
             font-weight: 500;
@@ -391,13 +391,13 @@
             color: var(--accent-color);
             outline: none;
         }
-        
+
     </style>
 </head>
 <body>
     <h1>Bluetooth Stopwatch</h1>
     <div class="time-display" id="currentTime">00:00.00</div>
-    
+
     <div class="controls">
         <button id="connectButton"><i class="fas fa-bluetooth-b"></i> デバイスに接続</button>
         <button id="startButton"><i class="fas fa-play"></i> スタート</button>
@@ -410,7 +410,7 @@
         <div class="column runner-list">
             <h2 style="font-size: 1.2em; margin-top: 5px; margin-bottom: 10px;">走者リスト</h2>
             <ul id="runnerList">
-                
+
             </ul>
             <button class="add-runner-btn" id="addRunnerButton"><i class="fas fa-plus"></i> 走者追加</button>
             <button id="exportAllButton" class="add-runner-btn" style="background-color: var(--export-all-btn-color); color: white; border: none; margin-top: 15px;"><i class="fas fa-file-export"></i> 全走者データを一括エクスポート</button>
@@ -436,7 +436,7 @@
             </ul>
         </div>
     </div>
-    
+
     <script>
         /* ==================================================================== */
         /* JavaScript (機能) セクション */
@@ -447,14 +447,15 @@
         let device;
         let characteristic;
         let isConnected = false;
+        let isConnecting = false;
 
         let startTime = 0;
         let elapsedTime = 0;
         let timerInterval;
         let isRunning = false;
         let lastTr = 0;
-        
-        let runners = []; // 初期データを空にするか、localStorageにない場合に使用
+
+        let runners = [];
         let nextRunnerId = 1;
         let selectedRunnerId = null;
 
@@ -477,13 +478,17 @@
         loadData();
         updateTimeDisplay(0);
         renderRunnerList();
-        
+
         // Event Listeners
-        connectButton.addEventListener('click', connectToDevice);
+        connectButton.addEventListener('click', () => {
+            if (!isConnecting) {
+                startBluetoothConnectionFlow();
+            }
+        });
         startButton.addEventListener('click', startStopwatch);
-        lapButton.addEventListener('click', () => recordLap("Lap"));
+        lapButton.addEventListener('click', () => recordLapGoal("Lap"));
         stopButton.addEventListener('click', () => {
-            recordGoal();
+            recordLapGoal("Goal");
             stopStopwatch();
         });
         resetButton.addEventListener('click', resetStopwatch);
@@ -492,7 +497,7 @@
         runnerListElement.addEventListener('click', (event) => {
             const listItem = event.target.closest('li');
             if (!listItem) return;
-            
+
             if (!listItem.querySelector('.runner-name-input')) {
                 selectRunner(event);
             }
@@ -507,7 +512,7 @@
         exportAllButton.addEventListener('click', exportAllToCsv);
         clearAllButton.addEventListener('click', clearAllData);
         clearRecordsButton.addEventListener('click', clearAllRecords);
-        
+
         // ========================
         // データ永続化の関数
         // ========================
@@ -516,12 +521,12 @@
             localStorage.setItem('nextRunnerId', nextRunnerId);
             localStorage.setItem('selectedRunnerId', selectedRunnerId);
         }
-        
+
         function loadData() {
             const savedRunners = localStorage.getItem('runnersData');
             const savedNextId = localStorage.getItem('nextRunnerId');
             const savedSelectedId = localStorage.getItem('selectedRunnerId');
-            
+
             if (savedRunners) {
                 runners = JSON.parse(savedRunners);
                 nextRunnerId = parseInt(savedNextId, 10);
@@ -537,32 +542,60 @@
             }
         }
 
-        async function connectToDevice() {
+        async function startBluetoothConnectionFlow() {
+            isConnecting = true;
+            connectButton.textContent = "スキャン中...";
             try {
-                console.log("デバイスをスキャン中...");
                 device = await navigator.bluetooth.requestDevice({
-                    filters: [{ services: [SERVICE_UUID] }]
+                    acceptAllDevices: true,
+                    optionalServices: [SERVICE_UUID]
                 });
-                
-                console.log(`'${device.name}' に接続中...`);
-                const server = await device.gatt.connect();
-                const service = await server.getPrimaryService(SERVICE_UUID);
-                characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
-
-                await characteristic.startNotifications();
-                characteristic.addEventListener('characteristicvaluechanged', handleNotifications);
-                
-                isConnected = true;
-                console.log("接続に成功しました。センサーからの通知を待機しています。");
-                connectButton.textContent = "接続済み";
-                connectButton.disabled = true;
-
+                connectButton.textContent = `接続中: ${device.name || '不明なデバイス'}`;
+                await connectToDevice(device);
             } catch (error) {
-                console.error(`接続エラー: ${error}`);
+                console.error(`Bluetooth接続エラー: ${error}`);
                 alert("Bluetooth接続に失敗しました。デバイスが近くにあるか、ペアリングモードになっているか確認してください。");
+                connectButton.textContent = "デバイスに接続";
+                isConnecting = false;
             }
         }
-        
+
+        async function connectToDevice(deviceToConnect) {
+            try {
+                if (!deviceToConnect.gatt.connected) {
+                    await deviceToConnect.gatt.connect();
+                }
+                deviceToConnect.addEventListener('gattserverdisconnected', onDisconnected);
+                const server = deviceToConnect.gatt;
+                const service = await server.getPrimaryService(SERVICE_UUID);
+                characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+                await characteristic.startNotifications();
+                characteristic.addEventListener('characteristicvaluechanged', handleNotifications);
+                isConnected = true;
+                isConnecting = false;
+                connectButton.textContent = "接続済み";
+                connectButton.disabled = true;
+                console.log("接続に成功しました。センサーからの通知を待機しています。");
+            } catch (error) {
+                console.error(`GATT接続エラー: ${error}`);
+                connectButton.textContent = "接続エラー";
+                isConnecting = false;
+                connectButton.disabled = false;
+            }
+        }
+
+        function onDisconnected(event) {
+            console.log(`デバイス ${event.target.name} が切断されました。`);
+            isConnected = false;
+            connectButton.textContent = "再接続を試行中...";
+            connectButton.disabled = false;
+            setTimeout(() => {
+                if (!isConnecting && !isConnected) {
+                    startBluetoothConnectionFlow();
+                }
+            }, 2000);
+        }
+
         function handleNotifications(event) {
             if (!isConnected) return;
 
@@ -575,27 +608,33 @@
                 const sw = data.sw;
                 const tr = data.tr;
 
+                // スイッチのリセットを優先して処理
+                if (sw > 0) { // Reset
+                    resetStopwatch();
+                    lastTr = 0;
+                    return;
+                }
+
+                // センサーのトリガーを処理
                 if (tr !== lastTr) {
-                    if (tr > lastTr) {
-                        if (tr === 1) { // START_TRG
-                            startStopwatch();
-                        } else if (isRunning) {
-                            if (tr === 2 || tr === 4) { // Lap
-                                recordLap();
-                            } else if (tr === 8) { // GOAL_TRG
-                                recordGoal();
-                                stopStopwatch();
-                            }
+                    if (tr === 1) { // START_TRG
+                        startStopwatch();
+                    } else if (isRunning) {
+                        if (tr === 2 || tr === 4) { // Lap
+                            recordLapGoal("Lap");
+                        } else if (tr === 8) { // GOAL_TRG
+                            recordLapGoal("Goal");
+                            stopStopwatch();
+                            lastTr = 0; // GOAL検知後にlastTrをリセット
                         }
                     }
                 }
-                
-                if (sw > 0) { // Reset
-                    resetStopwatch();
+
+                if (tr !== 8) { // GOAL以外の値であれば、lastTrを更新
+                    lastTr = tr;
                 }
-                
-                lastTr = tr;
-                
+
+
             } catch (e) {
                 console.error(`JSONパースエラー: ${e}`);
             }
@@ -648,48 +687,39 @@
 
             const format = (num) => num.toString().padStart(2, '0');
             const formatHundredths = (num) => num.toString().padStart(2, '0');
-            
+
             currentTimeDisplay.textContent = `${format(minutes)}:${format(seconds)}.${formatHundredths(hundredthsOfSeconds)}`;
         }
 
-        function recordLap() {
+        function recordLapGoal(triggerType) {
             if (selectedRunnerId === null) {
                 return;
             }
             const runner = runners.find(r => r.id === selectedRunnerId);
-            if (runner && isRunning) {
-                const newRecord = { 
-                    lapTime: formatTime(elapsedTime),
-                    goalTime: ""
-                };
-                runner.records.unshift(newRecord); // 先頭に追加
-                renderSelectedRunnerRecords();
-                saveData();
+            if (!runner || !isRunning) {
+                return;
             }
+
+            const currentTime = formatTime(elapsedTime);
+            let latestRecord = runner.records[0];
+
+            // 最新の記録がラップタイムのみを持っている場合、そこにゴールタイムを追加する
+            if (latestRecord && triggerType === "Goal" && latestRecord.lapTime && !latestRecord.goalTime) {
+                latestRecord.goalTime = currentTime;
+            } else {
+                // それ以外の場合は、常に新しい記録を作成する
+                const newRecord = {
+                    time: elapsedTime,
+                    lapTime: triggerType === "Lap" ? currentTime : "",
+                    goalTime: triggerType === "Goal" ? currentTime : ""
+                };
+                runner.records.unshift(newRecord);
+            }
+
+            renderSelectedRunnerRecords();
+            saveData();
         }
 
-        function recordGoal() {
-            if (selectedRunnerId === null) {
-                return;
-            }
-            const runner = runners.find(r => r.id === selectedRunnerId);
-            if (runner && isRunning) {
-                if (runner.records.length > 0 && runner.records[0].goalTime === "") {
-                    // ラップが記録されていて、ゴールがまだの場合
-                    runner.records[0].goalTime = formatTime(elapsedTime);
-                } else {
-                    // ラップが記録されていない場合
-                    const newRecord = {
-                        lapTime: "",
-                        goalTime: formatTime(elapsedTime)
-                    };
-                    runner.records.unshift(newRecord); // 先頭に追加
-                }
-                renderSelectedRunnerRecords();
-                saveData();
-            }
-        }
-        
         function deleteRunner(runnerId) {
             if (runnerId === null) return;
             const runner = runners.find(r => r.id === runnerId);
@@ -703,7 +733,7 @@
                 saveData(); // データの変更を保存
             }
         }
-        
+
         function deleteRecord(recordIndex) {
             const runner = runners.find(r => r.id === selectedRunnerId);
             if (runner && confirm("この記録を削除しますか？")) {
@@ -712,7 +742,7 @@
                 saveData(); // データの変更を保存
             }
         }
-        
+
         function clearAllData() {
             if (confirm("全ての走者データと記録を削除します。よろしいですか？この操作は元に戻せません。")) {
                 runners = [];
@@ -741,7 +771,7 @@
             runners.push(newRunner);
             nextRunnerId++;
             renderRunnerList();
-            selectedRunnerId = newRunner.id; 
+            selectedRunnerId = newRunner.id;
             renderSelectedRunnerRecords();
             saveData(); // データの変更を保存
         }
@@ -751,7 +781,7 @@
             if (listItem && !listItem.querySelector('.runner-name-input')) {
                 const runnerId = parseInt(listItem.dataset.id);
                 selectedRunnerId = runnerId;
-                
+
                 document.querySelectorAll('#runnerList li').forEach(li => li.classList.remove('selected'));
                 listItem.classList.add('selected');
 
@@ -768,12 +798,12 @@
             runners.forEach(runner => {
                 const li = document.createElement('li');
                 li.dataset.id = runner.id;
-                
+
                 const runnerNameSpan = document.createElement('span');
                 runnerNameSpan.classList.add('runner-name');
                 runnerNameSpan.textContent = runner.name;
                 runnerNameSpan.addEventListener('dblclick', (e) => editRunnerName(e.currentTarget, runner.id));
-                
+
                 li.appendChild(runnerNameSpan);
 
                 if (runner.id === selectedRunnerId) {
@@ -789,7 +819,7 @@
                  renderSelectedRunnerRecords();
             }
         }
-        
+
         function editRunnerName(targetElement, runnerId) {
             const runner = runners.find(r => r.id === runnerId);
             if (!runner) return;
@@ -799,7 +829,7 @@
             input.type = 'text';
             input.value = oldName;
             input.classList.add('runner-name-input');
-            
+
             targetElement.innerHTML = '';
             targetElement.appendChild(input);
             input.focus();
@@ -824,10 +854,10 @@
                 }
             });
         }
-        
+
         function renderSelectedRunnerRecords() {
             recordsListElement.innerHTML = '';
-            
+
             if (selectedRunnerId === null) {
                 selectedRunnerNameElement.textContent = `走者を選択してください`;
                 deleteRunnerButton.disabled = true;
@@ -842,22 +872,22 @@
             if (runner) {
                 selectedRunnerNameElement.textContent = `${runner.name}`;
                 deleteRunnerButton.disabled = false;
-                
+
                 if (runner.records.length > 0) {
-                    const reversedRecords = runner.records; 
+                    const reversedRecords = runner.records;
                     reversedRecords.forEach((record, index) => {
                         const li = document.createElement('li');
                         li.classList.add('selected-runner-record-item');
-                        li.dataset.index = index; 
-                        
+                        li.dataset.index = index;
+
                         const recordNumberSpan = document.createElement('span');
                         recordNumberSpan.classList.add('record-number');
                         recordNumberSpan.textContent = `${reversedRecords.length - index}`;
-                        
+
                         const lapTimeSpan = document.createElement('span');
                         lapTimeSpan.classList.add('runner-lap-time');
                         lapTimeSpan.textContent = record.lapTime;
-                        
+
                         const goalTimeSpan = document.createElement('span');
                         goalTimeSpan.classList.add('runner-goal-time');
                         goalTimeSpan.textContent = record.goalTime;
@@ -865,7 +895,7 @@
                         const deleteButton = document.createElement('button');
                         deleteButton.classList.add('delete-btn');
                         deleteButton.innerHTML = '<i class="fas fa-trash-alt"></i>';
-                        
+
                         li.appendChild(recordNumberSpan);
                         li.appendChild(lapTimeSpan);
                         li.appendChild(goalTimeSpan);
@@ -884,7 +914,7 @@
                 renderSelectedRunnerRecords();
             }
         }
-        
+
         function handleGlobalKeydown(e) {
             if (e.key === 'Enter' && e.target.tagName === 'INPUT') {
                 e.target.blur();
@@ -896,13 +926,13 @@
             const seconds = totalSeconds % 60;
             const minutes = Math.floor(totalSeconds / 60);
             const hundredths = Math.floor((milliseconds % 1000) / 10);
-            
+
             const format = (num) => num.toString().padStart(2, '0');
             const formatHundredths = (num) => num.toString().padStart(2, '0');
-            
+
             return `${format(minutes)}:${format(seconds)}.${formatHundredths(hundredths)}`;
         }
-        
+
         function escapeCsv(str) {
             if (str && (str.includes(',') || str.includes('"') || str.includes('\n'))) {
                 return `"${str.replace(/"/g, '""')}"`;
@@ -928,9 +958,7 @@
 
             runnersData.forEach(runner => {
                 let row = escapeCsv(runner.name);
-                
-                const reversedRecords = [...runner.records].reverse();
-
+                const reversedRecords = runner.records; // Fix: No need to reverse again
                 for (let i = 0; i < maxRecords; i++) {
                     if (i < reversedRecords.length) {
                         const record = reversedRecords[i];
@@ -943,24 +971,23 @@
                 }
                 csv += row + "\n";
             });
-
             return csv;
         }
-        
+
         function exportAllToCsv() {
             if (runners.length === 0) {
                 alert("エクスポートする走者がいません。");
                 return;
             }
-            
+
             const csvContent = convertToCsvString(runners);
             downloadCsv(csvContent, "全走者記録.csv");
         }
-        
+
         function downloadCsv(csvContent, filename) {
             const BOM = new Uint8Array([0xEF, 0xBB, 0xBF]);
             const blob = new Blob([BOM, csvContent], { type: 'text/csv;charset=utf-8;' });
-            
+
             const link = document.createElement("a");
             if (link.download !== undefined) {
                 const url = URL.createObjectURL(blob);
