@@ -2,13 +2,12 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bluetooth Stopwatch App</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         /* ==================================================================== */
-        /* CSS (デザイン) セクション - スマートフォン向けに最適化 */
+        /* CSS (デザイン) セクション - 更新版 */
         /* ==================================================================== */
         :root {
             --bg-color: #1a1a1a;
@@ -17,12 +16,12 @@
             --secondary-text-color: #b0b0b0;
             --border-color: #383838;
             --accent-color: #00b8d9;
-            --accent-light: #00b8d920;
+            --accent-light: #00b8d920; /* 薄い透明なアクセント色 */
             --button-connect: #007aff;
             --button-start: #34c759;
             --button-stop: #ff3b30;
             --button-reset: #ff9500;
-            --button-lap: #8e8e93;
+            --button-lap: #8e8e93; /* 新しいラップボタンの色 */
             --delete-btn-color: #ff4500;
             --export-all-btn-color: #5856d6;
             --clear-all-btn-color: #ff3b30;
@@ -77,33 +76,19 @@
             flex-grow: 1;
         }
 
-        /* 画面幅が768px以下の場合（タブレットやスマホ） */
         @media (max-width: 768px) {
-            .main-container {
-                flex-direction: column;
-                gap: 15px; /* 列間の隙間を少し減らす */
-            }
             .column {
-                min-width: 100%; /* 列が全幅を占めるようにする */
-                min-height: auto;
-                padding: 15px;
-            }
-            .runner-list ul {
-                flex-direction: column; /* 走者リストを縦に並べる */
-            }
-            .runner-list li {
-                width: 100%; /* 各走者項目を全幅にする */
-                padding: 15px; /* タップしやすくするためパディングを増やす */
-                text-align: left;
+                min-width: 90%;
             }
         }
+
 
         /* ストップウォッチ表示エリア */
         .time-display {
             font-family: var(--font-display);
-            font-size: 3em; /* スマホ向けに少し小さく */
+            font-size: 4em;
             margin-bottom: 20px;
-            color: #39ff14;
+            color: #39ff14; /* 蛍光緑に変更 */
             font-weight: 500;
             letter-spacing: 2px;
             background: rgba(0, 184, 217, 0.1);
@@ -138,9 +123,6 @@
             box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            flex: 1 1 45%; /* モバイルで2列表示にする */
-            box-sizing: border-box;
-            min-width: 120px;
         }
 
         .controls button:hover:not(:disabled) {
@@ -166,15 +148,15 @@
         #resetButton { background-color: var(--button-reset); }
         #lapButton { background-color: var(--button-lap); }
 
-        .add-runner-btn,
-        #exportAllButton,
-        #clearAllButton,
-        #clearRecordsButton {
-            width: 100%; /* ボタンを全幅にする */
+        .add-runner-btn {
+            width: 100%;
             padding: 12px;
+            background-color: transparent;
+            border: 2px dashed var(--accent-color);
             border-radius: 6px;
             cursor: pointer;
             margin-top: 15px;
+            color: var(--accent-color);
             font-size: 0.9em;
             font-weight: 500;
             transition: all 0.3s;
@@ -182,9 +164,6 @@
             align-items: center;
             justify-content: center;
             gap: 8px;
-            border: 2px dashed var(--accent-color);
-            color: var(--accent-color);
-            background-color: transparent;
         }
 
         .add-runner-btn:hover {
@@ -196,18 +175,24 @@
             background-color: var(--export-all-btn-color);
             color: white;
             border: none;
+            margin-top: 15px;
+            width: 100%;
         }
 
         #clearAllButton {
             background-color: var(--clear-all-btn-color);
             color: white;
             border: none;
+            margin-top: 10px;
+            width: 100%;
         }
 
         #clearRecordsButton {
             background-color: var(--delete-btn-color);
             color: white;
             border: none;
+            margin-top: 10px;
+            width: 100%;
         }
 
         /* 走者リストのタイル表示用CSS */
@@ -224,7 +209,7 @@
             justify-content: flex-start;
         }
         .runner-list li {
-            width: calc(50% - 6px); /* 2列表示 */
+            width: calc(25% - 6px);
             padding: 10px;
             border: 1px solid var(--border-color);
             border-radius: 6px;
@@ -238,15 +223,6 @@
             align-items: center;
             position: relative;
         }
-        /* 768px以下では、liを全幅にする */
-        @media (max-width: 768px) {
-             .runner-list li {
-                width: 100%;
-                padding: 15px; /* タップしやすく */
-                text-align: left;
-            }
-        }
-
 
         .runner-list li:hover {
             background-color: var(--accent-light);
@@ -296,7 +272,7 @@
             border-radius: 3px;
         }
 
-        /* ヘッダーの新しいレイアウト */
+        /* ★ヘッダーの新しいレイアウト */
         .header-top-row {
             display: flex;
             justify-content: space-between;
@@ -311,16 +287,17 @@
             margin-bottom: 5px;
         }
 
-        .header-record-labels span:nth-child(1) {
+        /* ヘッダーの「No」「Lap」「Goal」を個別に配置調整 */
+        .header-record-labels span:nth-child(1) { /* No */
             justify-self: start;
         }
 
-        .header-record-labels span:nth-child(2) {
+        .header-record-labels span:nth-child(2) { /* Lap */
             justify-self: center;
         }
 
-        .header-record-labels span:nth-child(3) {
-            justify-self: center;
+        .header-record-labels span:nth-child(3) { /* Goal */
+            justify-self: center; /* 中央に配置し、少し左に寄せる */
         }
 
         .selected-runner-name {
@@ -350,7 +327,7 @@
             cursor: not-allowed;
         }
 
-        /* 記録リストの新しいレイアウト */
+        /* ★記録リストの新しいレイアウト */
         .selected-runner-record-item {
             padding: 10px 8px;
             border-bottom: 1px solid var(--border-color);
@@ -367,7 +344,7 @@
             font-weight: 500;
             color: var(--secondary-text-color);
             font-size: 0.8em;
-            text-align: left;
+            text-align: left; /* Noは左揃え */
             grid-column: 1 / 2;
         }
 
@@ -376,7 +353,7 @@
             font-weight: 500;
             font-size: 1em;
             color: var(--text-color);
-            text-align: center;
+            text-align: center; /* ラップタイムは中央揃え */
             grid-column: 2 / 3;
         }
 
@@ -385,7 +362,7 @@
             font-weight: 500;
             font-size: 1em;
             color: var(--text-color);
-            text-align: center;
+            text-align: center; /* ゴールタイムは中央揃え */
             grid-column: 3 / 4;
         }
 
@@ -561,7 +538,7 @@
                 ];
                 nextRunnerId = 2;
                 selectedRunnerId = 1;
-                saveData();
+                saveData(); // 初期データを保存
             }
         }
 
@@ -631,27 +608,29 @@
                 const sw = data.sw;
                 const tr = data.tr;
 
-                if (sw > 0) {
+                // スイッチのリセットを優先して処理
+                if (sw > 0) { // Reset
                     resetStopwatch();
                     lastTr = 0;
                     return;
                 }
 
+                // センサーのトリガーを処理
                 if (tr !== lastTr) {
-                    if (tr === 1) {
+                    if (tr === 1) { // START_TRG
                         startStopwatch();
                     } else if (isRunning) {
-                        if (tr === 2 || tr === 4) {
+                        if (tr === 2 || tr === 4) { // Lap
                             recordLapGoal("Lap");
-                        } else if (tr === 8) {
+                        } else if (tr === 8) { // GOAL_TRG
                             recordLapGoal("Goal");
                             stopStopwatch();
-                            lastTr = 0;
+                            lastTr = 0; // GOAL検知後にlastTrをリセット
                         }
                     }
                 }
 
-                if (tr !== 8) {
+                if (tr !== 8) { // GOAL以外の値であれば、lastTrを更新
                     lastTr = tr;
                 }
 
@@ -724,9 +703,11 @@
             const currentTime = formatTime(elapsedTime);
             let latestRecord = runner.records[0];
 
+            // 最新の記録がラップタイムのみを持っている場合、そこにゴールタイムを追加する
             if (latestRecord && triggerType === "Goal" && latestRecord.lapTime && !latestRecord.goalTime) {
                 latestRecord.goalTime = currentTime;
             } else {
+                // それ以外の場合は、常に新しい記録を作成する
                 const newRecord = {
                     time: elapsedTime,
                     lapTime: triggerType === "Lap" ? currentTime : "",
@@ -749,7 +730,7 @@
                 }
                 renderRunnerList();
                 renderSelectedRunnerRecords();
-                saveData();
+                saveData(); // データの変更を保存
             }
         }
 
@@ -758,7 +739,7 @@
             if (runner && confirm("この記録を削除しますか？")) {
                 runner.records.splice(recordIndex, 1);
                 renderSelectedRunnerRecords();
-                saveData();
+                saveData(); // データの変更を保存
             }
         }
 
@@ -792,7 +773,7 @@
             renderRunnerList();
             selectedRunnerId = newRunner.id;
             renderSelectedRunnerRecords();
-            saveData();
+            saveData(); // データの変更を保存
         }
 
         function selectRunner(event) {
@@ -805,7 +786,7 @@
                 listItem.classList.add('selected');
 
                 renderSelectedRunnerRecords();
-                saveData();
+                saveData(); // データの変更を保存
             }
         }
 
@@ -860,7 +841,7 @@
                     runner.name = newName;
                     renderRunnerList();
                     renderSelectedRunnerRecords();
-                    saveData();
+                    saveData(); // データの変更を保存
                 } else {
                     renderRunnerList();
                 }
@@ -977,7 +958,7 @@
 
             runnersData.forEach(runner => {
                 let row = escapeCsv(runner.name);
-                const reversedRecords = runner.records;
+                const reversedRecords = runner.records; // Fix: No need to reverse again
                 for (let i = 0; i < maxRecords; i++) {
                     if (i < reversedRecords.length) {
                         const record = reversedRecords[i];
